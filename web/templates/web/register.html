@@ -1,0 +1,41 @@
+{% extends "web/base.html" %}
+{# S2 - Register. API: POST /auth/register/ #}
+{% block body %}
+<div class="auth-wrap">
+  <h1 class="brand">HelpDesk Pro</h1>
+  <form id="form" class="card auth-card" novalidate>
+    <h2>Create account</h2>
+    <div id="banner"></div>
+    <label>Username
+      <input name="username" autocomplete="username" required>
+      <span class="field-error" data-for="username"></span>
+    </label>
+    <label>Email
+      <input type="email" name="email" autocomplete="email" required>
+      <span class="field-error" data-for="email"></span>
+    </label>
+    <label>Password
+      <input type="password" name="password" autocomplete="new-password" required>
+      <span class="field-error" data-for="password"></span>
+    </label>
+    <label>Confirm password
+      <input type="password" name="password2" autocomplete="new-password" required>
+      <span class="field-error" data-for="password2"></span>
+    </label>
+    <button class="btn primary" type="submit">Register</button>
+    <p class="muted">Already a user? <a href="/login/">Login →</a></p>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  document.getElementById("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const r = await api("/auth/register/", { method: "POST", body: Object.fromEntries(new FormData(form)) });
+    if (r.status === 201) { location.href = "/login/?registered=1"; return; }
+    const other = showFieldErrors(form, r.data);   // errors shown under each input (400)
+    banner("error", other);
+  });
+</script>
+{% endblock %}

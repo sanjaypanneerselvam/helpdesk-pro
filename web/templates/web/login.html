@@ -1,0 +1,38 @@
+{% extends "web/base.html" %}
+{# S1 - Login. API: POST /auth/login/ #}
+{% block body %}
+<div class="auth-wrap">
+  <h1 class="brand">HelpDesk Pro</h1>
+  <form id="form" class="card auth-card" novalidate>
+    <h2>Sign in</h2>
+    <div id="banner"></div>
+    <label>Username
+      <input name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Password
+      <input type="password" name="password" autocomplete="current-password" required>
+    </label>
+    <button class="btn primary" type="submit">Sign in</button>
+    <p class="muted">New here? <a href="/register/">Register →</a></p>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const params = new URLSearchParams(location.search);
+  if (params.get("registered")) banner("ok", "Account created. Please sign in.");
+  if (params.get("expired")) banner("error", "Your session expired. Please sign in again.");
+
+  // Already logged in? Go straight to the right dashboard.
+  if (Auth.token() && Auth.user()) location.href = HOME[Auth.user().role];
+
+  document.getElementById("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target));
+    const r = await api("/auth/login/", { method: "POST", body });
+    if (!r.ok) { banner("error", errorText(r.data)); return; }
+    Auth.save(r.data.token, r.data.user);
+    location.href = HOME[r.data.user.role];   // CUSTOMER->S3, AGENT->S7, ADMIN->S9
+  });
+</script>
+{% endblock %}

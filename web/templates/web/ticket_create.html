@@ -1,0 +1,52 @@
+{% extends "web/layout.html" %}
+{# S5 - Create ticket. API: GET /categories/ on load, POST /tickets/ on submit #}
+{% block roles %}CUSTOMER,ADMIN{% endblock %}
+{% block content %}
+<div class="page-head"><h1>New ticket</h1></div>
+<form id="form" class="card" novalidate>
+  <div id="banner"></div>
+  <label>Title
+    <input name="title" maxlength="200" required>
+    <span class="field-error" data-for="title"></span>
+  </label>
+  <div class="row">
+    <label>Category
+      <select name="category" id="category" required></select>
+      <span class="field-error" data-for="category"></span>
+    </label>
+    <label>Priority
+      <select name="priority">
+        <option>LOW</option><option selected>MEDIUM</option><option>HIGH</option><option>URGENT</option>
+      </select>
+      <span class="field-error" data-for="priority"></span>
+    </label>
+  </div>
+  <label>Description
+    <textarea name="description" required></textarea>
+    <span class="field-error" data-for="description"></span>
+  </label>
+  <div class="actions">
+    <button class="btn primary" type="submit">Submit ticket</button>
+    <a class="btn" href="/tickets/">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.pageInit = async () => {
+    const r = await api("/categories/");
+    document.getElementById("category").innerHTML = r.ok
+      ? `<option value="">Choose…</option>` + r.data.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")
+      : "";
+    document.getElementById("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const body = Object.fromEntries(new FormData(form));
+      if (body.category) body.category = Number(body.category); else delete body.category;
+      const res = await api("/tickets/", { method: "POST", body });
+      if (res.status === 201) { location.href = `/tickets/${res.data.id}/`; return; }  // on save -> S6
+      banner("error", showFieldErrors(form, res.data));
+    });
+  };
+</script>
+{% endblock %}

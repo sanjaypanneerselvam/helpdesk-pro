@@ -1,0 +1,43 @@
+{% extends "web/layout.html" %}
+{# S7 - Agent queue. API: GET /tickets/queue/, GET /tickets/?assigned_to=me, POST /tickets/{id}/assign/ #}
+{% block roles %}AGENT,ADMIN{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Agent queue</h1></div>
+<div id="banner"></div>
+<div class="card">
+  <h2>Unassigned queue</h2>
+  <div id="queue"><div class="empty">Loading…</div></div>
+</div>
+<div class="card">
+  <h2>My tickets</h2>
+  <div id="mine"><div class="empty">Loading…</div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  async function load() {
+    const [queue, mine] = await Promise.all([
+      api("/tickets/queue/?ordering=-created_at"),
+      api("/tickets/?assigned_to=me&ordering=-updated_at"),
+    ]);
+    document.getElementById("queue").innerHTML = queue.ok
+      ? ticketTable(queue.data.results, {
+          actionsFor: (t) => `<button class="btn sm primary" data-assign="${t.id}">Assign to me</button>`,
+        })
+      : `<div class="banner error">${esc(errorText(queue.data))}</div>`;
+    document.getElementById("mine").innerHTML = mine.ok
+      ? ticketTable(mine.data.results)
+      : `<div class="banner error">${esc(errorText(mine.data))}</div>`;
+  }
+  window.pageInit = async () => {
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-assign]");
+      if (!btn) return;
+      const r = await api(`/tickets/${btn.dataset.assign}/assign/`, { method: "POST" });
+      banner(r.ok ? "ok" : "error", r.ok ? "Ticket assigned to you." : errorText(r.data));
+      load();
+    });
+    load();
+  };
+</script>
+{% endblock %}

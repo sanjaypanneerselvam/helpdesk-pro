@@ -1,0 +1,34 @@
+{% extends "web/layout.html" %}
+{# S3 - Customer dashboard. API: GET /tickets/summary/ and GET /tickets/?ordering=-created_at&page_size=5 #}
+{% block roles %}CUSTOMER,ADMIN{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Dashboard</h1>
+  <a class="btn primary" href="/tickets/new/">+ New Ticket</a>
+</div>
+<div class="grid" id="stats"></div>
+<div class="card">
+  <h2>Recent tickets</h2>
+  <div id="recent"><div class="empty">Loading…</div></div>
+  <p><a href="/tickets/">View all my tickets →</a></p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.pageInit = async () => {
+    const [summary, recent] = await Promise.all([
+      api("/tickets/summary/"),
+      api("/tickets/?ordering=-created_at&page_size=5"),
+    ]);
+    if (summary.ok) {
+      const d = summary.data;
+      document.getElementById("stats").innerHTML = [
+        ["Open", d.OPEN], ["In Progress", d.IN_PROGRESS], ["Resolved", d.RESOLVED], ["Closed", d.CLOSED],
+      ].map(([l, n]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+    }
+    document.getElementById("recent").innerHTML = recent.ok
+      ? ticketTable(recent.data.results)
+      : `<div class="banner error">${esc(errorText(recent.data))}</div>`;
+  };
+</script>
+{% endblock %}

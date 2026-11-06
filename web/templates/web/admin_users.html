@@ -1,0 +1,68 @@
+{% extends "web/layout.html" %}
+{# S10 - Admin: users. API: GET /users/?role=, PATCH /users/{id}/ #}
+{% block roles %}ADMIN{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Users</h1>
+  <select id="role-filter" style="width:auto">
+    <option value="">All roles</option><option>CUSTOMER</option><option>AGENT</option><option>ADMIN</option>
+  </select>
+</div>
+<div id="banner"></div>
+<div class="card">
+  <div id="users"><div class="empty">Loading…</div></div>
+  <div class="pager">
+    <button class="btn sm" id="prev">← Previous</button>
+    <span class="muted" id="page-info"></span>
+    <button class="btn sm" id="next">Next →</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  let page = 1;
+  async function load() {
+    const q = new URLSearchParams({ page });
+    const role = document.getElementById("role-filter").value;
+    if (role) q.set("role", role);
+    const r = await api("/users/?" + q);
+    const box = document.getElementById("users");
+    if (!r.ok) {
+      if (r.status === 404 && page > 1) { page = 1; return load(); }
+      box.innerHTML = `<div class="banner error">${esc(errorText(r.data))}</div>`;
+      return;
+    }
+    const me = Auth.user().id;
+    box.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Active</th></tr></thead><tbody>` +
+      r.data.results.map((u) => `
+        <tr>
+          <td><b>${esc(u.username)}</b></td>
+          <td>${esc(u.email)}</td>
+          <td><select data-id="${u.id}" data-field="role" style="margin:0" ${u.id === me ? "disabled" : ""}>
+            ${["CUSTOMER", "AGENT", "ADMIN"].map((x) => `<option ${x === u.role ? "selected" : ""}>${x}</option>`).join("")}
+          </select></td>
+          <td><label class="check" style="margin:0"><input type="checkbox" data-id="${u.id}" data-field="is_active"
+              ${u.is_active ? "checked" : ""} ${u.id === me ? "disabled" : ""}> ${u.is_active ? "Active" : "Disabled"}</label></td>
+        </tr>`).join("") + `</tbody></table></div>`;
+    document.getElementById("prev").disabled = !r.data.previous;
+    document.getElementById("next").disabled = !r.data.next;
+    document.getElementById("page-info").textContent = `Page ${page} · ${r.data.count} user(s)`;
+  }
+
+  window.pageInit = async () => {
+    document.getElementById("role-filter").addEventListener("change", () => { page = 1; load(); });
+    document.getElementById("prev").addEventListener("click", () => { page--; load(); });
+    document.getElementById("next").addEventListener("click", () => { page++; load(); });
+    document.getElementById("users").addEventListener("change", async (e) => {
+      const el = e.target;
+      if (!el.dataset.field) return;
+      const body = { [el.dataset.field]: el.type === "checkbox" ? el.checked : el.value };
+      const r = await api(`/users/${el.dataset.id}/`, { method: "PATCH", body });
+      banner(r.ok ? "ok" : "error", r.ok ? `Updated ${r.data.username}.` : errorText(r.data));
+      load();
+    });
+    load();
+  };
+</script>
+{% endblock %}

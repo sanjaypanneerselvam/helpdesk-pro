@@ -1,0 +1,8 @@
+{% extends "web/base.html" %}
+{# Layout for every logged-in screen: top bar + page container. #}
+{# Child pages set which roles may open them via the "roles" block. #}
+{% block bodyattrs %}data-roles="{% block roles %}CUSTOMER,AGENT,ADMIN{% endblock %}" {% block extraattrs %}{% endblock %}{% endblock %}
+{% block body %}
+<header class="topbar" id="topbar"></header>
+<main>{% block content %}{% endblock %}</main>
+{% endblock %}

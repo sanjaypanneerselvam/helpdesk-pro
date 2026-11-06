@@ -1,0 +1,29 @@
+{% extends "web/layout.html" %}
+{# S9 - Admin dashboard. API: GET /stats/ #}
+{% block roles %}ADMIN{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Admin dashboard</h1>
+  <a class="btn" href="/admin-panel/users/">Manage users →</a>
+</div>
+<div id="banner"></div>
+<h3>By status</h3>
+<div class="grid" id="by-status"></div>
+<h3>By priority</h3>
+<div class="grid" id="by-priority"></div>
+<div class="card" id="totals"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const stat = (l, n) => `<div class="stat"><div class="n">${n}</div><div class="l">${esc(label(l))}</div></div>`;
+  window.pageInit = async () => {
+    const r = await api("/stats/");
+    if (!r.ok) { banner("error", errorText(r.data)); return; }
+    const d = r.data;
+    document.getElementById("by-status").innerHTML = Object.entries(d.by_status).map(([k, v]) => stat(k, v)).join("");
+    document.getElementById("by-priority").innerHTML = Object.entries(d.by_priority).map(([k, v]) => stat(k, v)).join("");
+    document.getElementById("totals").innerHTML =
+      `<b>${d.total}</b> tickets in total · <b>${d.unassigned}</b> not yet assigned (excluding closed) · <a href="/tickets/">View all tickets →</a>`;
+  };
+</script>
+{% endblock %}

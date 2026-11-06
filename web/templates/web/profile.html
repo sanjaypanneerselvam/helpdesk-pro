@@ -1,0 +1,76 @@
+{% extends "web/layout.html" %}
+{# S8 - Profile. API: GET/PATCH /auth/me/, POST /auth/change-password/ #}
+{% block content %}
+<div class="page-head"><h1>Profile</h1></div>
+<div id="banner"></div>
+<form id="profile-form" class="card" novalidate>
+  <h2>My details</h2>
+  <div class="row">
+    <label>Username <input id="username" disabled></label>
+    <label>Role <input id="role" disabled></label>
+  </div>
+  <div class="row">
+    <label>First name <input name="first_name"><span class="field-error" data-for="first_name"></span></label>
+    <label>Last name <input name="last_name"><span class="field-error" data-for="last_name"></span></label>
+  </div>
+  <div class="row">
+    <label>Email <input type="email" name="email"><span class="field-error" data-for="email"></span></label>
+    <label>Phone <input name="phone"><span class="field-error" data-for="phone"></span></label>
+  </div>
+  <button class="btn primary" type="submit">Save changes</button>
+</form>
+
+<form id="password-form" class="card" novalidate>
+  <h2>Change password</h2>
+  <div class="row">
+    <label>Current password
+      <input type="password" name="old_password" autocomplete="current-password">
+      <span class="field-error" data-for="old_password"></span>
+    </label>
+    <label>New password
+      <input type="password" name="new_password" autocomplete="new-password">
+      <span class="field-error" data-for="new_password"></span>
+    </label>
+  </div>
+  <button class="btn primary" type="submit">Change password</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.pageInit = async () => {
+    const pf = document.getElementById("profile-form");
+    const r = await api("/auth/me/");
+    if (r.ok) {
+      document.getElementById("username").value = r.data.username;
+      document.getElementById("role").value = r.data.role;
+      for (const k of ["first_name", "last_name", "email", "phone"]) pf[k].value = r.data[k] || "";
+    }
+
+    pf.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const res = await api("/auth/me/", { method: "PATCH", body: Object.fromEntries(new FormData(pf)) });
+      if (res.ok) {
+        Auth.save(Auth.token(), res.data);
+        banner("ok", "Profile saved.");
+        showFieldErrors(pf, {});
+      } else {
+        banner("error", showFieldErrors(pf, res.data));
+      }
+    });
+
+    const pw = document.getElementById("password-form");
+    pw.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const res = await api("/auth/change-password/", { method: "POST", body: Object.fromEntries(new FormData(pw)) });
+      if (res.ok) {
+        Auth.save(res.data.token, Auth.user());   // the API gives us a fresh token
+        pw.reset();
+        showFieldErrors(pw, {});
+        banner("ok", "Password changed.");
+      } else {
+        banner("error", showFieldErrors(pw, res.data));
+      }
+    });
+  };
+</script>
+{% endblock %}

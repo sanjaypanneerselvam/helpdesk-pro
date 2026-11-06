@@ -1,0 +1,62 @@
+{% extends "web/layout.html" %}
+{# S4 - Ticket list (all roles, scoped by the API). API: GET /tickets/?search=&status=&priority=&page= #}
+{% block content %}
+<div class="page-head">
+  <h1>Tickets</h1>
+  <a class="btn primary" id="new-btn" href="/tickets/new/" hidden>+ New Ticket</a>
+</div>
+<div class="card">
+  <div class="filters">
+    <input id="search" placeholder="Search title or description…">
+    <select id="status">
+      <option value="">All statuses</option>
+      <option>OPEN</option><option>IN_PROGRESS</option><option>RESOLVED</option><option>CLOSED</option>
+    </select>
+    <select id="priority">
+      <option value="">All priorities</option>
+      <option>LOW</option><option>MEDIUM</option><option>HIGH</option><option>URGENT</option>
+    </select>
+  </div>
+  <div id="list"><div class="empty">Loading…</div></div>
+  <div class="pager">
+    <button class="btn sm" id="prev">← Previous</button>
+    <span class="muted" id="page-info"></span>
+    <button class="btn sm" id="next">Next →</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  let page = 1, timer;
+  async function load() {
+    const q = new URLSearchParams({ ordering: "-created_at", page });
+    for (const id of ["search", "status", "priority"]) {
+      const v = document.getElementById(id).value.trim();
+      if (v) q.set(id, v);
+    }
+    const r = await api("/tickets/?" + q);
+    const list = document.getElementById("list");
+    if (!r.ok) {
+      // e.g. 404 "Invalid page" after filtering: go back to page 1
+      if (r.status === 404 && page > 1) { page = 1; return load(); }
+      list.innerHTML = `<div class="banner error">${esc(errorText(r.data))}</div>`;
+      return;
+    }
+    list.innerHTML = ticketTable(r.data.results);
+    document.getElementById("prev").disabled = !r.data.previous;
+    document.getElementById("next").disabled = !r.data.next;
+    document.getElementById("page-info").textContent = `Page ${page} · ${r.data.count} ticket(s)`;
+  }
+  function reload() { page = 1; load(); }
+
+  window.pageInit = async (user) => {
+    if (user.role !== "AGENT") document.getElementById("new-btn").hidden = false;
+    document.getElementById("search").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(reload, 300); });
+    document.getElementById("status").addEventListener("change", reload);
+    document.getElementById("priority").addEventListener("change", reload);
+    document.getElementById("prev").addEventListener("click", () => { page--; load(); });
+    document.getElementById("next").addEventListener("click", () => { page++; load(); });
+    load();
+  };
+</script>
+{% endblock %}

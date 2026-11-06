@@ -1,0 +1,107 @@
+{% extends "web/layout.html" %}
+{# S6 - Ticket detail (the main screen).
+   API: GET /tickets/{id}/, POST /tickets/{id}/comments/, POST /tickets/{id}/assign/,
+        PATCH /tickets/{id}/, DELETE /tickets/{id}/ #}
+{% block extraattrs %}data-ticket-id="{{ ticket_id }}"{% endblock %}
+{% block content %}
+<div id="banner"></div>
+<div id="ticket"><div class="card empty">Loading…</div></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  window.pageInit = async (user) => {
+    const id = document.body.dataset.ticketId;
+    const box = document.getElementById("ticket");
+    const isStaff = user.role !== "CUSTOMER";
+    const NEXT = { OPEN: "IN_PROGRESS", IN_PROGRESS: "RESOLVED", RESOLVED: "CLOSED" };
+    const NEXT_TEXT = { IN_PROGRESS: "Start work", RESOLVED: "Mark resolved", CLOSED: "Close ticket" };
+
+    async function load() {
+      const r = await api(`/tickets/${id}/`);
+      if (!r.ok) {
+        box.innerHTML = `<div class="card"><div class="banner error">${esc(errorText(r.data))}</div>
+          <a href="/tickets/">← Back to tickets</a></div>`;
+        return;
+      }
+      render(r.data);
+    }
+
+    function actionButtons(t) {
+      const b = [];
+      const reopenable = ["RESOLVED", "CLOSED"].includes(t.status);
+      if (isStaff) {
+        if (!t.assigned_to && t.status !== "CLOSED") b.push(`<button class="btn" data-act="assign">Assign to me</button>`);
+        if (NEXT[t.status]) b.push(`<button class="btn primary" data-act="status" data-value="${NEXT[t.status]}">${NEXT_TEXT[NEXT[t.status]]}</button>`);
+        if (reopenable) b.push(`<button class="btn" data-act="status" data-value="OPEN">Reopen</button>`);
+        if (user.role === "ADMIN") b.push(`<button class="btn danger" data-act="delete">Delete</button>`);
+      } else {
+        if (t.status === "RESOLVED") b.push(`<button class="btn primary" data-act="status" data-value="CLOSED">Close ticket</button>`);
+        if (reopenable) b.push(`<button class="btn" data-act="status" data-value="OPEN">Reopen</button>`);
+      }
+      return b.join("");
+    }
+
+    function render(t) {
+      const comments = t.comments.length ? t.comments.map((c) => `
+        <div class="comment ${c.is_internal ? "is-internal" : ""}">
+          <div class="who"><b>${esc(c.author)}</b> (${esc(c.author_role.toLowerCase())}) · ${esc(fmt(c.created_at))}
+            ${c.is_internal ? '<span class="badge internal">Internal note</span>' : ""}</div>
+          <p>${esc(c.message)}</p>
+        </div>`).join("") : `<div class="muted">No comments yet.</div>`;
+
+      box.innerHTML = `
+        <div class="card">
+          <div class="page-head"><h1>#${t.id} ${esc(t.title)}</h1><div>${badge(t.status)} ${badge(t.priority)}</div></div>
+          <div class="meta">
+            <span>Category: <b>${esc(t.category.name)}</b></span>
+            <span>Created by: <b>${esc(t.created_by)}</b></span>
+            <span>Assigned to: <b>${esc(t.assigned_to || "Unassigned")}</b></span>
+            <span>Created: <b>${esc(fmt(t.created_at))}</b></span>
+            <span>Updated: <b>${esc(fmt(t.updated_at))}</b></span>
+          </div>
+          <div class="description">${esc(t.description)}</div>
+          <div class="actions">${actionButtons(t)}</div>
+        </div>
+        <div class="card">
+          <h2>Comments (${t.comment_count})</h2>
+          ${comments}
+          <form id="comment-form">
+            <label>Add a comment <textarea name="message" required></textarea></label>
+            ${isStaff ? `<label class="check"><input type="checkbox" name="is_internal"> Internal note (hidden from the customer)</label>` : ""}
+            <button class="btn primary" type="submit">Post comment</button>
+          </form>
+        </div>`;
+    }
+
+    box.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      banner("", "");
+      let r;
+      if (btn.dataset.act === "assign") {
+        r = await api(`/tickets/${id}/assign/`, { method: "POST" });
+      } else if (btn.dataset.act === "status") {
+        r = await api(`/tickets/${id}/`, { method: "PATCH", body: { status: btn.dataset.value } });
+      } else if (btn.dataset.act === "delete") {
+        if (!confirm("Delete this ticket permanently?")) return;
+        r = await api(`/tickets/${id}/`, { method: "DELETE" });
+        if (r.ok) { location.href = "/tickets/"; return; }
+      }
+      if (!r.ok) banner("error", errorText(r.data));
+      load();
+    });
+
+    box.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const f = e.target;
+      const body = { message: f.message.value.trim(), is_internal: !!(f.is_internal && f.is_internal.checked) };
+      const r = await api(`/tickets/${id}/comments/`, { method: "POST", body });
+      if (!r.ok) { banner("error", errorText(r.data)); return; }
+      banner("", "");
+      load();
+    });
+
+    load();
+  };
+</script>
+{% endblock %}
